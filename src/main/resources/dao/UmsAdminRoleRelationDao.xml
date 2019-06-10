@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.tiny.dao.UmsAdminRoleRelationDao">
+
+    <select id="getPermissionList" resultType="com.macro.mall.tiny.mbg.model.UmsPermission">
+         <!-- #查询用户的角色权限与自定义权限,且角色权限中必须是能type不等于-1的能用权限,在角色与
+		#这里是角色的权限-->
+			 SELECT
+            p.*
+        FROM
+            ums_admin_role_relation ar
+            LEFT JOIN ums_role r ON ar.role_id = r.id
+            LEFT JOIN ums_role_permission_relation rp ON r.id = rp.role_id
+            LEFT JOIN ums_permission p ON rp.permission_id = p.id
+        WHERE
+            ar.admin_id = #{admin}
+            AND p.id IS NOT NULL
+            AND p.id NOT IN (
+               <!-- #根据后台用户ID查询其父类权限ID, 		    限制条件为父类条件为用户权限表中的type字段不能为-1,其中type类型不能为-1,也就是权限被下线状态-->
+								SELECT
+                    p.id
+                FROM
+                    ums_admin_permission_relation pr
+                    LEFT JOIN ums_permission p ON pr.permission_id = p.id
+                WHERE
+                    pr.type = - 1
+                    AND pr.admin_id = #{admin}
+        )
+				<!--#union是将两个sql的结果集合并在一起的意思-->
+				UNION
+				<!--这里是除角色定义的权限外的加减权限	  ,且要求type必须是1,(也就是权限没有被超级管理员下线)-->
+        SELECT
+            p.*
+        FROM
+            ums_admin_permission_relation pr
+            LEFT JOIN ums_permission p ON pr.permission_id = p.id
+        WHERE
+            pr.type = 1
+						AND pr.admin_id =#{admin}
+    </select>
+</mapper>

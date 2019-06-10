@@ -1,6 +1,7 @@
 package com.macro.mall.tiny.controller;
 
 import com.macro.mall.tiny.common.api.CommonResult;
+import com.macro.mall.tiny.dto.UmsAdminLoginParam;
 import com.macro.mall.tiny.dto.UmsAdminParam;
 import com.macro.mall.tiny.mbg.model.UmsAdmin;
 import com.macro.mall.tiny.service.UmsAdminService;
@@ -28,9 +29,14 @@ public class UmAdminController {
     @Value("{jwt.tokenHead}")
     private String tokenHead;
 
-
-    @ApiOperation(value = "登录以后返回token")
-    @RequestMapping(value = "/login", method = RequestMethod.POST)
+    /**
+     * 用户注册接口
+     * @param umsAdminParam
+     * @param result
+     * @return
+     */
+    @ApiOperation(value = "用户注册")
+    @RequestMapping(value = "/register", method = RequestMethod.POST)
     public CommonResult<UmsAdmin> register(@RequestBody UmsAdminParam umsAdminParam, BindingResult result){
                 UmsAdmin umsAdmin=adminService.register(umsAdminParam);
                 if (umsAdmin==null){
@@ -38,7 +44,10 @@ public class UmAdminController {
                 }
                 return CommonResult.success(umsAdmin);
 }
-
+    public CommonResult login(@RequestBody UmsAdminLoginParam umsAdminLoginParam,
+                              BindingResult result){
+        adminService.login
+    }
 
 
 }
