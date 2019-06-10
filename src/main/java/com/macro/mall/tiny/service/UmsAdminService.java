@@ -3,6 +3,7 @@ package com.macro.mall.tiny.service;
 import com.macro.mall.tiny.dto.UmsAdminParam;
 import com.macro.mall.tiny.mbg.model.UmsAdmin;
 import com.macro.mall.tiny.mbg.model.UmsPermission;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
@@ -39,4 +40,11 @@ public interface UmsAdminService {
      * @return
      */
     String login(String username,String password);
+
+    /**
+     * 刷新Token的功能(类似于续期的感觉?以前只能登录7天现在刷新一下计时,或者说将老Token无效化?)
+     * @param oldToken
+     * @return
+     */
+    String refreshToken(String oldToken);
 }

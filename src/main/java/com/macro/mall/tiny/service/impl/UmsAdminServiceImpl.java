@@ -1,6 +1,8 @@
 package com.macro.mall.tiny.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.macro.mall.tiny.Utils.JwtTokenUtil;
+import com.macro.mall.tiny.dao.UmsAdminRoleRelationDao;
 import com.macro.mall.tiny.dto.UmsAdminParam;
 import com.macro.mall.tiny.mbg.mapper.UmsAdminMapper;
 import com.macro.mall.tiny.mbg.model.UmsAdmin;
@@ -9,10 +11,14 @@ import com.macro.mall.tiny.mbg.model.UmsPermission;
 import com.macro.mall.tiny.service.UmsAdminService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +36,14 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     //引入springsecurity的加密机制
     @Autowired
     private UserDetailsService userDetailsService;
+    @Autowired
+    private JwtTokenUtil jwtTokenUtil;
+    @Autowired
+    private UmsAdminRoleRelationDao umsAdminRoleRelationDao;
+    @Value("${jwt.tokenHead}")
+    private String tokenHead;
+
+
 
     /**
      * 根据用户名获取管理员(用户全部信息)
@@ -40,7 +54,7 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     public UmsAdmin getAdminByUsername(String username) {
         //根据用户名查询用户全部信息
         UmsAdminExample example = new UmsAdminExample();
-        example.createCriteria().andUsernameNotEqualTo(username);
+        example.createCriteria().andUsernameEqualTo(username);
         List<UmsAdmin> adminList = adminMapper.selectByExample(example);
         //如果数据库中有这个用户,将用户返回
         if (adminList !=null&&adminList.size()>0){
@@ -88,20 +102,21 @@ public class UmsAdminServiceImpl implements UmsAdminService {
      */
     @Override
     public List<UmsPermission> getPermissionList(Long adminId) {
-
-        return null;
+        List<UmsPermission> permissionList = umsAdminRoleRelationDao.getPermissionList(adminId);
+        return permissionList;
     }
 
     @Override
     public String login(String username, String password) {
         String token = null;
-        //密码需要客户端加密后传递
-        //1.通过用户名获取用户的全部信息与权限列表
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-        //2.通过matches方法进行比对密码,如果不匹配抛出异常
-        if (!passwordEncoder.matches(password,userDetails.getPassword())){
-            throw new BadCredentialsException("密码不正确");
-        }
+        try {
+            //密码需要客户端加密后传递
+            //1.通过用户名获取用户的全部信息与权限列表
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            //2.通过matches方法进行比对密码,如果不匹配抛出异常
+            if (!passwordEncoder.matches(password,userDetails.getPassword())){
+                throw new BadCredentialsException("密码不正确");
+            }
 //        标准认证过程：
 //        1.用户使用username和password登录
 //        2.系统验证这个password对于该username是正确的
@@ -114,8 +129,34 @@ public class UmsAdminServiceImpl implements UmsAdminService {
 //        2.这个token被传递给AuthenticationManager进行验证
 //        3.成功认证后AuthenticationManager将返回一个得到完整填充的Authentication实例
 //        4.通过调用SecurityContextHolder.getContext().setAuthentication(...)，参数传递authentication对象，来建立安全上下文（security context）
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            //UsernamePasswordAuthenticationToken（Authentication接口的实例）的实例中,这个token被传递给AuthenticationManager进行验证
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            //建立安全上下文
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            //注入jwtTokenUtils,通过Springsecurity的UserDetails信息获得Token
+            token = jwtTokenUtil.generateToken(userDetails);
+//        //添加登录记录,这个接口还没写,暂时忽略
+//        insertLoginLog(username);
+        } catch (AuthenticationException e) {
+                //本来是两个异常,这里合并成抓父类异常
+            log.warn("登录异常:{}",e.getMessage());
+        }
+        return token;
+    }
 
+    /**
+     * 刷新Token的功能
+     * @param oldToken
+     * @return
+     */
+    @Override
+    public String refreshToken(String oldToken) {
+        //substring() 方法用于提取字符串中介于两个指定下标之间的子字符串,这里是从tokenHead的长度开始
+        //获得之后的字符串内容,也就是Token的内容
+        String token = oldToken.substring(tokenHead.length());
+        if (jwtTokenUtil.canRefresh(token)){
+            return jwtTokenUtil.refreshToken(token);
+        }
         return null;
     }
 }

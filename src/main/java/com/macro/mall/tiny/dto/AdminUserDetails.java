@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 /**
 
  * SpringSecurity需要的用户详情
- * Created by macro on 2018/4/26.
+ *
  */
 
 public class AdminUserDetails implements UserDetails {
@@ -37,7 +37,6 @@ public class AdminUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-
         //返回当前用户的权限
         return permissionList.stream()
                 .filter(permission -> permission.getValue()!=null)
