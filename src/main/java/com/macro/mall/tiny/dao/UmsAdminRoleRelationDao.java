@@ -22,7 +22,7 @@ public interface UmsAdminRoleRelationDao {
     /**
      * 批量插入数据到用户与角色关系映射表
      */
-    int insertList(@Param("adminRoleRelationList") List<UmsAdminRoleRelation> adminRoleRelationList);
+    int insertList(@Param("list") List<UmsAdminRoleRelation> adminRoleRelationList);
 
 
     /**

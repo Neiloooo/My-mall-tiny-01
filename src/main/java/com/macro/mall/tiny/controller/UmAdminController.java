@@ -5,6 +5,7 @@ import com.macro.mall.tiny.common.api.CommonResult;
 import com.macro.mall.tiny.dto.UmsAdminLoginParam;
 import com.macro.mall.tiny.dto.UmsAdminParam;
 import com.macro.mall.tiny.mbg.model.UmsAdmin;
+import com.macro.mall.tiny.mbg.model.UmsPermission;
 import com.macro.mall.tiny.mbg.model.UmsRole;
 import com.macro.mall.tiny.service.UmsAdminService;
 import io.swagger.annotations.Api;
@@ -249,7 +250,22 @@ public class UmAdminController {
             @RequestParam Long adminId,
             @RequestParam("permissionIds") List<Long> permissionIds
     ){
-                adminService.
+        int count = adminService.updatePermission(adminId, permissionIds);
+        if (count>0){
+            return CommonResult.success(count,"修改成功");
+        }
+        return CommonResult.failed("修改失败");
     }
 
+    /**
+     * 根据用户ID获取用户的所有权限包括角色与+-权限
+     * @param adminId
+     * @return
+     */
+    @ApiOperation("获取用户所有权限（包括+-权限）")
+    @RequestMapping(value = "/permission/{adminId}", method = RequestMethod.GET)
+    public CommonResult<List<UmsPermission>> getPermissionList(@PathVariable Long adminId){
+        List<UmsPermission> permissionList = adminService.getPermissionList(adminId);
+        return CommonResult.success(permissionList);
+    }
 }

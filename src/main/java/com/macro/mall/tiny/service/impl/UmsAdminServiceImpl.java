@@ -3,6 +3,7 @@ package com.macro.mall.tiny.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.github.pagehelper.PageHelper;
 import com.macro.mall.tiny.Utils.JwtTokenUtil;
+import com.macro.mall.tiny.dao.UmsAdminPermissionRelationDao;
 import com.macro.mall.tiny.dao.UmsAdminRoleRelationDao;
 import com.macro.mall.tiny.dto.UmsAdminParam;
 import com.macro.mall.tiny.mbg.mapper.UmsAdminMapper;
@@ -28,6 +29,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -41,6 +43,8 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     private UmsAdminRoleRelationDao adminRoleRelationDao;
     @Autowired
     private UmsAdminPermissionRelationMapper adminPermissionRelationMapper;
+    @Autowired
+    private UmsAdminPermissionRelationDao adminPermissionRelationDao;
     @Autowired
     private PasswordEncoder passwordEncoder;
     //引入springsecurity的加密机制
@@ -265,15 +269,55 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     }
 
     @Override
-    public int updatePermission(Long adminId, List<Long> permissionId) {
+    public int updatePermission(Long adminId, List<Long> permissionIds) {
         //1.同样是多对多的关系,所以更新权限,需要先删后增(用户表与自定义权限关系表)
         UmsAdminPermissionRelationExample example = new UmsAdminPermissionRelationExample();
         example.createCriteria().andAdminIdEqualTo(adminId);
         adminPermissionRelationMapper.deleteByExample(example);
         //2.获取用户所有角色权限
-        //
+        //2.1获取权限列表
         List<UmsPermission> permissionList = adminRoleRelationDao.getPermissionList(adminId);
+        //2.2获得角色的权限的id,并且放入集合
+        List<Long> rolePermissionList = permissionList.stream().map(UmsPermission::getId).collect(Collectors.toList());
+        //如果用户传入了权限
+        if (!CollectionUtils.isEmpty(permissionIds)){
+            List<UmsAdminPermissionRelation> relationList = new ArrayList<>();
+            //获取用户添加的权限,这些权限需要与角色权限不同,所以要将+权限进行过滤(获取+权限)
+            List<Long> addPermissionIdList = permissionIds.stream().filter(permissionId -> !rolePermissionList.contains(permissionId)).collect(Collectors.toList());
+        //筛选过滤减权限,这里的减权限可以认为,超级管理员只给了123权限,但是用户的角色里有人4权限,那么角色的权限4权限就需要被取消,
+            //也就是前端传来的权限为准,用户由于角色多出来的权限需要被无效化.(也就是减权限)
+            List<Long> subPermissionIdList = rolePermissionList.stream().filter(permissionId -> !permissionIds.contains(permissionId)).collect(Collectors.toList());
+            //将+-程序组装成对象,传进List中,然后传递给数据库
+            relationList.addAll(convert(adminId,1,addPermissionIdList));
+            relationList.addAll(convert(adminId,-1,subPermissionIdList));
+            //这里是批量插入,需要自定义Mapper
+            return adminPermissionRelationDao.insertList(relationList);
+        }
+
         return 0;
     }
+
+    /**
+     * 将用户的id,权限,以及权限是否启用(Type)封装进对象,再封装进集合中
+     * @param adminId
+     * @param type
+     * @param permissionIdList
+     * @return
+     */
+    private List<UmsAdminPermissionRelation> convert(Long adminId,Integer type,List<Long> permissionIdList){
+        //将传进来的权限id集合转换成id,传入到拉姆达函数中
+        //stream流中map的意思是将一种类型,转换成另一种类型,而明显这里把Long类型转换成了UmsAdminPermissionRelation
+        //参数已经遍历过了,,,你会发现,,传入的就是遍历后的参数
+       List<UmsAdminPermissionRelation> relationList = permissionIdList.stream().map(permissionId-> {
+           UmsAdminPermissionRelation relation = new UmsAdminPermissionRelation();
+           relation.setAdminId(adminId);
+           relation.setType(type);
+           relation.setPermissionId(permissionId);
+           return relation;
+       }) .collect(Collectors.toList());
+       return relationList;
+    }
+
+
 }
 
